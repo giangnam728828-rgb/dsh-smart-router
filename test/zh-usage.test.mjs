@@ -1,5 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import { SKILL_ZH, describeSkill } from '../lib/zh.js'
 import { clearUsage, noteToolCall, usageOf } from '../lib/usage.js'
@@ -48,4 +51,25 @@ test('脏输入被忽略', () => {
   noteToolCall('s2', '', {})
   noteToolCall('s2', 'skill', {})
   assert.deepEqual(usageOf('s2'), { skills: [], tools: [] })
+})
+
+test('用户中文表优先于内置表，且缺条目时不影响其它技能', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'zh-override-'))
+  mkdirSync(join(dir, 'smart-router'), { recursive: true })
+  writeFileSync(join(dir, 'smart-router', 'skills.zh.json'), JSON.stringify({ 'brand-new-skill': '这是用户自己写的中文' }), 'utf8')
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = dir
+  try {
+    const result = describeSkill('brand-new-skill', 'English description')
+    assert.equal(result.translated, true)
+    assert.equal(result.text, '这是用户自己写的中文')
+    // 表里没有的，照旧退回英文，不编造
+    const other = describeSkill('not-in-any-table', 'English description')
+    assert.equal(other.translated, false)
+    assert.equal(other.text, 'English description')
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

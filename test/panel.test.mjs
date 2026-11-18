@@ -142,3 +142,20 @@ test('响应里的每一块都是真数组/真对象，不是被序列化成 {} 
   assert.equal(res.body.usage.total, 1234)
   assert.deepEqual(res.body.used.skills, ['pdf-tools'])
 })
+
+test('插件条目也带 translated 标记（客户端靠它决定要不要补刷）', async () => {
+  const route = createPanelHandler({
+    connection: { requestRejection: () => undefined },
+    resolveAgent: () => undefined,
+    listSkills: async () => [],
+    listFamilies: () => [],
+    listPlugins: () => [
+      { name: 'with-zh', description: 'English', descriptionZh: '中文' },
+      { name: 'no-zh', description: 'English' },
+    ],
+    readUsage: () => ({}),
+    readUsed: () => ({ skills: [], tools: [] }),
+  })
+  const { body } = await call(route, { url: '/api/dsh-smart-router?sessionId=s1' })
+  assert.deepEqual(body.plugins.map((plugin) => plugin.translated), [true, false])
+})
