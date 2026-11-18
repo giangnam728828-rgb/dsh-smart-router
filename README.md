@@ -115,7 +115,10 @@ apply(ctx) ──▶ ctx.on('agent/pre-step', ...)
 - 随仓库发布的技能：`lib/zh.js` 里的内置表
 - **你以后新装的技能**：写到 `$DSH_HOME/smart-router/skills.zh.json`，
   形如 `{ "my-skill": "这个技能干什么" }`。文件改完下次打开面板就生效，不用重启。
-- 表里没有的：显示英文原文，不编造翻译。
+- 表里没有的：**自动翻译**。用 DSH 自带的 `translator` 服务翻一次，落盘到
+  `$DSH_HOME/smart-router/translations.zh.json`，以后都读缓存，不再发请求。
+  单个请求最多等 2.5 秒，翻不完的留在后台继续 —— 面板永远不会因为它变慢。
+  翻译失败就显示英文原文，绝不少东西。
 
 ---
 
