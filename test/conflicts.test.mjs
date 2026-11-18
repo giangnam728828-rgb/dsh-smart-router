@@ -10,7 +10,7 @@ import assert from 'node:assert/strict'
 
 import { apply } from '../lib/plugin.js'
 import { claimRoute, clearPins, peekPinned, setPinned, MAX_PIN_SESSIONS, ROUTE, ROUTE_OWNER_KEY } from '../lib/panel.js'
-import { clearUsage, MAX_SESSIONS, noteToolCall, usageOf } from '../lib/usage.js'
+import { clearUsage, MAX_SESSIONS, noteSkillInjection, noteToolCall, usageOf } from '../lib/usage.js'
 
 /** 和真宿主一样：同一个 (kind, path) 注册两次直接抛错。 */
 function makeServer() {
@@ -91,7 +91,7 @@ test('钉住项按会话有上限，不会一路涨上去', () => {
 test('用量记录按会话有上限', () => {
   clearUsage()
   for (let i = 0; i < MAX_SESSIONS * 2; i += 1) noteToolCall(`u${i}`, 'read_file')
-  assert.deepEqual(usageOf(`u${MAX_SESSIONS * 2 - 1}`).tools, [{ name: 'read_file', count: 1 }])
+  assert.deepEqual(usageOf(`u${MAX_SESSIONS * 2 - 1}`).tools.map((row) => [row.name, row.count]), [['read_file', 1]])
   assert.deepEqual(usageOf('u0'), { skills: [], tools: [] }, '最旧的应被淘汰')
   clearUsage()
 })
@@ -162,12 +162,12 @@ test('同一次工具调用只记一遍（多实例并存时不重复记账）',
     const record = ctx.handlers.get('tools/execute')[0]
     await record(exec, async () => 'ok')
   }
-  assert.deepEqual(usageOf('dup-session').tools, [{ name: 'read_file', count: 1 }])
+  assert.deepEqual(usageOf('dup-session').tools.map((row) => [row.name, row.count]), [['read_file', 1]])
 
   // 另一次真实调用必须照常累加
   const again = { agent: { id: 'dup-session' }, name: 'read_file', arguments: {} }
   await channels[0].handlers.get('tools/execute')[0](again, async () => 'ok')
-  assert.deepEqual(usageOf('dup-session').tools, [{ name: 'read_file', count: 2 }])
+  assert.deepEqual(usageOf('dup-session').tools.map((row) => [row.name, row.count]), [['read_file', 2]])
   clearUsage()
 })
 
@@ -249,4 +249,53 @@ test('技能服务挂住时，回合不被拖死（这一轮降级、照常继�
 
   assert.equal(decision.kind, 'enter', '必须把这一步还回去，不能卡死')
   assert.ok(elapsed < 3000, `应在超时后返回（实际 ${elapsed}ms）`)
+})
+
+test('钉住的技能：注入了才算「已注入」，取不到记为「未找到」', async () => {
+  clearUsage()
+  const handlers = new Map()
+  const services = {
+    skills: {
+      snapshot: async () => ({ skills: [] }),
+      get: async (name) => (name === 'real-skill' ? { name, content: '正文', provider: 'filesystem' } : undefined),
+    },
+    tools: { definitions: () => [] },
+    agents: { get: () => undefined, roots: () => [], list: () => [] },
+  }
+  const ctx = {
+    get: (name) => services[name],
+    inject: () => {},
+    effect: () => {},
+    on: (event, handler) => {
+      if (!handlers.has(event)) handlers.set(event, [])
+      handlers.get(event).push(handler)
+    },
+  }
+  apply(ctx, { debug: false })
+  const pre = handlers.get('agent/pre-step')[0]
+
+  setPinned('pin-session', { skills: ['real-skill', 'ghost-skill'] })
+  const out = await pre(
+    {
+      agent: { id: 'pin-session', session: { header: { cwd: '/tmp' } } },
+      messages: [{ role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '随便问一句' }] }],
+      step: 1,
+    },
+    async () => ({ kind: 'enter', messages: [] }),
+  )
+
+  const usage = usageOf('pin-session')
+  const byName = Object.fromEntries(usage.skills.map((row) => [row.name, row.via]))
+  assert.equal(byName['real-skill'], 'injected', '取到的技能应记为已注入')
+  assert.equal(byName['ghost-skill'], 'missing', '取不到的技能必须留痕，不能让用户以为勾对了')
+  assert.ok(out.messages.some((message) => JSON.stringify(message).includes('正文')), '真正的技能正文要进上下文')
+  // 队列被消费掉：不会每轮重复加载
+  assert.deepEqual(peekPinned('pin-session').skills, [])
+})
+
+test('模型自己加载过的技能，不会被后来的注入降级', () => {
+  clearUsage()
+  noteToolCall('rank', 'skill', { name: 'shared' })
+  noteSkillInjection('rank', ['shared'])
+  assert.equal(usageOf('rank').skills[0].via, 'tool')
 })

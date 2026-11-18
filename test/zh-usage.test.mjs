@@ -34,10 +34,11 @@ test('记录真实工具调用：技能单列，工具计数', () => {
   noteToolCall('s1', 'android_click', {})
   noteToolCall('s1', 'web_search', {})
   const usage = usageOf('s1')
-  assert.deepEqual(usage.skills, ['pdf-tools'])
-  assert.deepEqual(usage.tools, [
-    { name: 'android_click', count: 2 },
-    { name: 'web_search', count: 1 },
+  assert.deepEqual(usage.skills.map((row) => [row.name, row.via]), [['pdf-tools', 'tool']])
+  assert.ok(typeof usage.skills[0].at === 'number' && usage.skills[0].at > 0, '技能事件要有时间戳')
+  assert.deepEqual(usage.tools.map((row) => [row.name, row.count]), [
+    ['android_click', 2],
+    ['web_search', 1],
   ])
 })
 

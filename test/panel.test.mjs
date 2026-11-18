@@ -159,3 +159,36 @@ test('插件条目也带 translated 标记（客户端靠它决定要不要补�
   const { body } = await call(route, { url: '/api/dsh-smart-router?sessionId=s1' })
   assert.deepEqual(body.plugins.map((plugin) => plugin.translated), [true, false])
 })
+
+test('轻量轮询只回会变的那几块，不重复扫技能目录', async () => {
+  let skillsCalls = 0
+  let pluginsCalls = 0
+  const route = createPanelHandler({
+    connection: { requestRejection: () => undefined },
+    resolveAgent: () => undefined,
+    listSkills: async () => {
+      skillsCalls += 1
+      return [{ name: 'pdf-tools', description: 'x' }]
+    },
+    listFamilies: () => [],
+    listPlugins: () => {
+      pluginsCalls += 1
+      return [{ name: 'p', description: 'x' }]
+    },
+    readUsage: () => ({ total: 42, at: 1000 }),
+    readUsed: () => ({ skills: [{ name: 'pdf-tools', via: 'injected', at: 900 }], tools: [] }),
+  })
+
+  const full = await call(route, { url: '/api/dsh-smart-router?sessionId=s1' })
+  assert.equal(skillsCalls, 1)
+  assert.equal(pluginsCalls, 1)
+
+  const light = await call(route, { url: '/api/dsh-smart-router?light=1&sessionId=s1' })
+  assert.equal(light.body.ok, true)
+  assert.equal(light.body.usage.total, 42)
+  assert.deepEqual(light.body.used.skills.map((row) => row.via), ['injected'])
+  assert.ok(typeof light.body.now === 'number')
+  assert.equal('skills' in light.body, false, '轻量模式不该带技能清单')
+  assert.equal(skillsCalls, 1, '轻量模式不能再扫一遍技能')
+  assert.equal(pluginsCalls, 1, '轻量模式不能再扫一遍插件')
+})
