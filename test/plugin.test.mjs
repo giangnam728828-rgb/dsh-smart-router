@@ -246,7 +246,7 @@ test('面板勾选的技能，在下一轮开头被真正加载（一次性）',
   const listener = ctx.listeners.get('agent/pre-step')
   const agent = { id: 's-pin', session: { header: { cwd: '/tmp' } } }
 
-  setPinned('s-pin', ['pdf-tools'])
+  setPinned('s-pin', { skills: ['pdf-tools'] })
   const first = await once(listener, { agent, messages: [userMessage('随便聊聊')] })
   const pinnedMessage = first.messages.find((m) => m.source?.kind === 'skill-invocation')
   assert.ok(pinnedMessage, '钉住的技能必须被加载')
@@ -265,7 +265,7 @@ test('钉住一个不存在的技能不会炸，也不会阻断这一轮', async
   apply(ctx, { enabled: true, includePlugins: false })
   const listener = ctx.listeners.get('agent/pre-step')
   const agent = { id: 's-pin2', session: { header: { cwd: '/tmp' } } }
-  setPinned('s-pin2', ['ghost-skill'])
+  setPinned('s-pin2', { skills: ['ghost-skill'] })
   const decision = await once(listener, { agent, messages: [userMessage('随便聊聊')] })
   assert.equal(decision.kind, 'enter')
 })

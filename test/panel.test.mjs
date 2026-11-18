@@ -33,7 +33,7 @@ test('GET 返回技能列表和当前钉住项', async () => {
   assert.equal(res.status, 200)
   assert.equal(res.body.ok, true)
   assert.deepEqual(res.body.skills.map((s) => s.name), ['pdf-tools', 'personalized-pages'])
-  assert.deepEqual(res.body.pinned, [])
+  assert.deepEqual(res.body.pinned, { skills: [], families: [] })
 })
 
 test('GET 缺 sessionId 时报 400，而不是返回空列表假装成功', async () => {
@@ -49,30 +49,30 @@ test('POST 钉住多个技能，可以多选', async () => {
     body: JSON.stringify({ sessionId: 's2', skills: ['pdf-tools', 'personalized-pages'] }),
   })
   assert.equal(res.status, 200)
-  assert.deepEqual(res.body.pinned, ['pdf-tools', 'personalized-pages'])
-  assert.deepEqual(peekPinned('s2'), ['pdf-tools', 'personalized-pages'])
+  assert.deepEqual(res.body.pinned.skills, ['pdf-tools', 'personalized-pages'])
+  assert.deepEqual(peekPinned('s2').skills, ['pdf-tools', 'personalized-pages'])
 })
 
 test('钉住是一次性消费：取走后清空', () => {
   clearPins()
-  setPinned('s3', ['pdf-tools'])
-  assert.deepEqual(takePinned('s3'), ['pdf-tools'])
-  assert.deepEqual(takePinned('s3'), [], '第二次取不到，避免每轮重复加载')
+  setPinned('s3', { skills: ['pdf-tools'] })
+  assert.deepEqual(takePinned('s3').skills, ['pdf-tools'])
+  assert.deepEqual(takePinned('s3').skills, [], '第二次取不到，避免每轮重复加载')
 })
 
 test('重复的名字会去重，超过上限会截断', () => {
   clearPins()
   const names = Array.from({ length: MAX_PINS + 5 }, (_, i) => `skill-${i}`)
-  const pinned = setPinned('s4', ['a', 'a', ...names])
-  assert.equal(pinned.length, MAX_PINS)
-  assert.equal(new Set(pinned).size, MAX_PINS)
+  const pinned = setPinned('s4', { skills: ['a', 'a', ...names] })
+  assert.equal(pinned.skills.length, MAX_PINS)
+  assert.equal(new Set(pinned.skills).size, MAX_PINS)
 })
 
 test('钉空等于清空', () => {
   clearPins()
-  setPinned('s5', ['a'])
-  setPinned('s5', [])
-  assert.deepEqual(peekPinned('s5'), [])
+  setPinned('s5', { skills: ['a'] })
+  setPinned('s5', {})
+  assert.deepEqual(peekPinned('s5'), { skills: [], families: [] })
 })
 
 test('拒绝跨站/未授权请求', async () => {
