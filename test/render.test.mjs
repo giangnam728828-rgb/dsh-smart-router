@@ -61,14 +61,14 @@ test('注入块不会包含技能正文级别的结构标记', () => {
   assert.ok(!text.includes('<skill_content'), '正文只能由模型自己 skill 加载，注入块不该带它')
 })
 
-test('renderTurnBlock: 只有工具族时也要输出（插件能力这一半）', () => {
+test('renderTurnBlock: 只有工具时也要输出（插件能力这一半）', () => {
   const text = renderTurnBlock({
     task: '把手机屏幕上的按钮点一下',
     candidates: [],
-    families: [{ name: 'android', count: 42, sample: '真实触控点击实体主屏' }],
+    tools: [{ name: 'android_click', description: '真实触控点击实体主屏' }],
     total: 0,
   })
-  assert.ok(text.includes('android（42 个工具）'))
+  assert.ok(text.includes('android_click — 真实触控点击实体主屏'))
   assert.ok(text.includes('你自己判断'))
   assert.ok(!text.includes('skill 工具'), '没有技能候选时不该让模型去调 skill')
 })

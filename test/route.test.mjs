@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { digestOf, familyOf, narrow, scoreCandidate, summarizeTools, tokenize, truncate } from '../lib/route.js'
+import { digestOf, familyOf, narrow, rankTools, scoreCandidate, summarizeTools, tokenize, truncate } from '../lib/route.js'
 
 test('tokenize: 中文按二元组切，不是一个字一个字符', () => {
   const tokens = tokenize('项目进度报告')
@@ -85,18 +85,47 @@ test('familyOf: MCP 工具按服务器归族，普通工具按前缀', () => {
   assert.equal(familyOf('mcp__lone'), 'mcp:lone')
 })
 
-test('summarizeTools: 归族、计数、按数量排序、可截断', () => {
+test('summarizeTools: 归族、计数、按数量排序', () => {
   const tools = [
     { name: 'android_click', description: '真实触控点击实体主屏' },
     { name: 'android_swipe', description: '真实触控滑动实体主屏' },
     { name: 'schedule_create', description: '创建定时任务' },
+    { name: 'schedule_list', description: '列出定时任务' },
+    { name: 'schedule_view', description: '查看定时任务' },
     { name: 'mcp__x__a', description: 'x a' },
   ]
   const families = summarizeTools(tools, { maxFamilies: 2 })
   assert.equal(families.length, 2)
-  assert.equal(families[0].name, 'android')
-  assert.equal(families[0].count, 2)
-  assert.ok(families[0].sample.length > 0)
+  assert.equal(families[0].name, 'schedule', '成员多的排前面')
+  assert.equal(families[0].count, 3)
+  assert.equal(families[1].name, 'android')
+})
+
+test('summarizeTools: 通用动词开头的不算族（list 族是噪声）', () => {
+  const tools = [
+    { name: 'list_agents', description: 'List subagents' },
+    { name: 'list_mcp_resources', description: 'List MCP resources' },
+    { name: 'list_mcp_resource_templates', description: 'List templates' },
+    { name: 'read_mcp_resource', description: 'Read a resource' },
+  ]
+  assert.deepEqual(summarizeTools(tools), [], '它们除了动词相同毫无关系，不该被归成一族')
+})
+
+test('summarizeTools: 单成员不成族', () => {
+  const tools = [{ name: 'schedule_create', description: '创建定时任务' }]
+  assert.deepEqual(summarizeTools(tools), [])
+})
+
+test('rankTools: 按本轮任务挑出具体工具，而不是族', () => {
+  const tools = [
+    { name: 'android_click', description: '真实触控点击实体主屏' },
+    { name: 'android_swipe', description: '真实触控滑动实体主屏' },
+    { name: 'web_search', description: 'Search the web' },
+  ]
+  const ranked = rankTools(tools, '在手机屏幕上点击按钮', { limit: 2 })
+  assert.ok(ranked.length >= 1)
+  assert.equal(ranked[0].name, 'android_click')
+  assert.ok(!ranked.some((tool) => tool.name === 'web_search'), '不相干的不该混进来')
 })
 
 test('truncate: 按码点切，不切出半个字', () => {
