@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { apply, name, SOURCE_KIND } from '../lib/plugin.js'
+import { apply, name, SHARED_STATE_KEY, SOURCE_KIND } from '../lib/plugin.js'
 
 /** 造一个最小的假 ctx：只实现 apply() 用到的那几个面。 */
 function makeCtx({ skills, tools } = {}) {
@@ -183,4 +183,22 @@ test('任务命中工具族时，即使没有技能候选也会给一条能力�
   const turn = texts[texts.length - 1]
   assert.ok(turn.includes('本轮可能用得上'), '最后一条应当是回合块')
   assert.ok(turn.includes('android'), '应当把 android 族排到前面')
+})
+
+test('同一进程里 apply() 被调多次时，不会重复注入同一份内容', async () => {
+  // 实测触发过：换入口文件那一次，loader 在一个进程里把 apply() 调了十遍。
+  // 去重状态若跟着实例走，十个实例就各注入一遍。
+  delete globalThis[SHARED_STATE_KEY]
+
+  const ctxA = makeCtx({ skills })
+  const ctxB = makeCtx({ skills })
+  apply(ctxA, { enabled: true })
+  apply(ctxB, { enabled: true })
+
+  const agent = { id: 's-shared', session: { header: { cwd: '/tmp' } } }
+  const first = await once(ctxA.listeners.get('agent/pre-step'), { agent, messages: [userMessage('合并 PDF')] })
+  assert.ok(first.messages.length > 1, '第一个实例负责注入')
+
+  const second = await once(ctxB.listeners.get('agent/pre-step'), { agent, messages: [userMessage('合并 PDF')] })
+  assert.equal(second.messages.length, 1, '第二个实例看到去重键已存在，不该再注入')
 })
