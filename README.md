@@ -174,7 +174,7 @@ node --test        # 36 个用例：分词、打分、收窄、渲染、配置�
 | `lib/plugins.js` | 只读：从 profile 读出已装插件与用途。 |
 | `lib/config.js` | 配置归一化 + 「哪些消息算用户任务」。 |
 | `lib/log.js` | 可选诊断日志，失败即静默。 |
-| `lib/index.js` | 唯一接触框架的地方：挂 `agent/pre-step`，串起上面几层。 |
+| `lib/plugin.js` | 唯一接触框架的地方：挂 `agent/pre-step`，串起上面几层。 |
 
 ### 扩展点
 
