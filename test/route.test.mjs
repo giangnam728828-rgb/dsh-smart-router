@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { digestOf, familyOf, narrow, rankTools, scoreCandidate, summarizeTools, tokenize, truncate } from '../lib/route.js'
+import { buildCorpusStats, digestOf, familyOf, narrow, rankTools, scoreCandidate, summarizeTools, tokenize, truncate } from '../lib/route.js'
 
 test('tokenize: 中文按二元组切，不是一个字一个字符', () => {
   const tokens = tokenize('项目进度报告')
@@ -29,12 +29,51 @@ test('tokenize: 中英混排两边都取到', () => {
 
 test('scoreCandidate: 上游漏掉的中文真实匹配，这里能命中', () => {
   // 上游注释里写的就是这一条：bge-m3 上只有 0.10~0.13，达不到 minScore。
+  const corpus = [
+    { name: 'internal-comms', description: '写项目进度报告、周报、团队同步邮件' },
+    { name: 'pdf-tools', description: '合并、拆分 PDF 文件' },
+    { name: 'deploy-vercel', description: 'Deploy an application to Vercel' },
+  ]
   const task = tokenize('帮我写一份项目进度报告发给团队')
-  const skill = {
-    name: 'internal-comms',
-    description: '写项目进度报告、周报、团队同步邮件',
-  }
-  assert.ok(scoreCandidate(task, skill) > 0.3, '字面高度重合时必须拿到明显分数')
+  const stats = buildCorpusStats(corpus)
+  assert.ok(scoreCandidate(task, corpus[0], stats) > 0.08, '字面高度重合时必须拿到明显分数')
+  assert.equal(scoreCandidate(task, corpus[2], stats), 0, '不相干的必须是 0')
+})
+
+test('tokenize: 连字符名字要拆开，否则名字永远匹配不上', () => {
+  const tokens = tokenize('personalized-pages')
+  assert.ok(tokens.has('personalized'))
+  assert.ok(tokens.has('page'), '复数词干也要有')
+  assert.ok(tokens.has('personalized-pages'), '完整标识符保留一份')
+})
+
+test('中文问「做个页面」能命中英文名 personalized-pages', () => {
+  const skills = [
+    { name: 'personalized-pages', description: 'Plan an optional page or small tool when the user asks for a page, tab, panel or interface' },
+    { name: 'pdf-tools', description: 'merge and split PDF files' },
+  ]
+  const result = narrow(skills, '帮我做个页面', { limit: 3, minimum: 0.012 })
+  assert.equal(result.selected[0]?.name, 'personalized-pages')
+})
+
+test('中文问「写个插件」能命中 cordis-plugin-development', () => {
+  const skills = [
+    { name: 'cordis-plugin-development', description: 'designing, reviewing, adding, or debugging a plugin, bundle, feature, page or tool' },
+    { name: 'pdf-tools', description: 'merge and split PDF files' },
+  ]
+  const result = narrow(skills, '我想写一个插件，怎么做', { limit: 3, minimum: 0.012 })
+  assert.equal(result.selected[0]?.name, 'cordis-plugin-development')
+})
+
+test('长句里的泛用词不再把无关工具拉进候选', () => {
+  // 真实事故：问「插件架构」却推出了三个 android 工具，命中的是「操作」「正常」。
+  const tools = [
+    { name: 'android_vscreen_tree', description: '读取虚拟屏无障碍控件树；返回 nodeId 供后续操作。' },
+    { name: 'android_key', description: '发送 Android 导航键。完成后默认返回新树观察；窗口切换时观察不可用属正常。' },
+    { name: 'android_type', description: '向已聚焦输入框写入文字。涉及敏感操作时先取得用户确认。' },
+  ]
+  const result = rankTools(tools, '我想问一下后续增加的插件以及技能能够正常触发吗然后选对率要提升', { limit: 3, minimum: 0.012 })
+  assert.deepEqual(result, [])
 })
 
 test('scoreCandidate: 完全不相干的是 0', () => {

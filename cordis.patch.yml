@@ -15,7 +15,7 @@
         # 每轮最多给几个技能候选。给太多等于没给。
         maxCandidates: 3
         # 只用来滤掉显然不相干的候选，不是「够不够用」的判定线。
-        minScore: 0.02
+        minScore: 0.012
         includePlugins: true
         pluginsLimit: 8
         includeToolFamilies: true

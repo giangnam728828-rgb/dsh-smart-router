@@ -202,3 +202,28 @@ test('同一进程里 apply() 被调多次时，不会重复注入同一份内�
   const second = await once(ctxB.listeners.get('agent/pre-step'), { agent, messages: [userMessage('合并 PDF')] })
   assert.equal(second.messages.length, 1, '第二个实例看到去重键已存在，不该再注入')
 })
+
+test('中途新增工具（装了新插件）后，静态块会补发一条更新', async () => {
+  delete globalThis[SHARED_STATE_KEY]
+  const toolList = [
+    { name: 'android_click', description: '真实触控点击实体主屏' },
+    { name: 'android_swipe', description: '真实触控滑动实体主屏' },
+  ]
+  const fakeTools = { definitions: () => toolList }
+  const ctx = makeCtx({ skills, tools: fakeTools })
+  // staticTtlMs: 0 表示每轮都复核，测试里不用等时间。
+  apply(ctx, { enabled: true, includePlugins: false, staticTtlMs: 0 })
+  const listener = ctx.listeners.get('agent/pre-step')
+  const agent = { id: 's-refresh', session: { header: { cwd: '/tmp' } } }
+
+  const first = await once(listener, { agent, messages: [userMessage('随便聊聊')] })
+  assert.equal(first.messages.length, 2, '第一轮应当有静态块')
+
+  // 模拟「中途装了新插件」：工具表变了。
+  toolList.push({ name: 'schedule_create', description: '创建定时任务' })
+  toolList.push({ name: 'schedule_list', description: '列出定时任务' })
+
+  const second = await once(listener, { agent, messages: [userMessage('随便聊聊')] })
+  assert.equal(second.messages.length, 2, '内容变了应当补发')
+  assert.ok(second.messages[1].content[0].text.includes('schedule'), '新工具族要出现在更新里')
+})
