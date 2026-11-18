@@ -33,7 +33,7 @@ test('GET 返回技能列表和当前钉住项', async () => {
   assert.equal(res.status, 200)
   assert.equal(res.body.ok, true)
   assert.deepEqual(res.body.skills.map((s) => s.name), ['pdf-tools', 'personalized-pages'])
-  assert.deepEqual(res.body.pinned, { skills: [], families: [] })
+  assert.deepEqual(res.body.pinned, { skills: [], families: [], plugins: [] })
 })
 
 test('GET 缺 sessionId 时报 400，而不是返回空列表假装成功', async () => {
@@ -72,7 +72,7 @@ test('钉空等于清空', () => {
   clearPins()
   setPinned('s5', { skills: ['a'] })
   setPinned('s5', {})
-  assert.deepEqual(peekPinned('s5'), { skills: [], families: [] })
+  assert.deepEqual(peekPinned('s5'), { skills: [], families: [], plugins: [] })
 })
 
 test('拒绝跨站/未授权请求', async () => {
@@ -91,7 +91,33 @@ test('坏 body 报 400，不抛异常', async () => {
   assert.equal(res.body.error, 'invalid-body')
 })
 
-test('不存在的会话返回 404', async () => {
+test('认不出的会话不拒绝服务，只返回能拿到的部分', async () => {
+  // 第一版在这里 404，导致整个面板报「没保存成功」。宁可少给数据，也别整块失败。
   const res = await call(handler({ sessionExists: () => false }), { url: '/api/dsh-smart-router?sessionId=ghost' })
-  assert.equal(res.status, 404)
+  assert.equal(res.status, 200)
+  assert.equal(res.body.ok, true)
+  assert.ok(Array.isArray(res.body.skills))
+})
+
+test('客户端 id 与 agent.id 对不上时，钉住项记在 agent.id 上', async () => {
+  clearPins()
+  const res = await call(
+    handler({
+      resolveAgent: (id) => (id === 'client-abc' ? { id: 'agent-xyz' } : undefined),
+    }),
+    { method: 'POST', body: JSON.stringify({ sessionId: 'client-abc', skills: ['pdf-tools'] }) },
+  )
+  assert.equal(res.status, 200)
+  assert.deepEqual(peekPinned('agent-xyz').skills, ['pdf-tools'], '必须落在下一轮能查到的键上')
+  assert.deepEqual(peekPinned('client-abc').skills, [])
+})
+
+test('插件也能被点名', async () => {
+  clearPins()
+  const res = await call(handler(), {
+    method: 'POST',
+    body: JSON.stringify({ sessionId: 's9', plugins: ['dshmarket'], families: ['android'] }),
+  })
+  assert.deepEqual(res.body.pinned.plugins, ['dshmarket'])
+  assert.deepEqual(res.body.pinned.families, ['android'])
 })
