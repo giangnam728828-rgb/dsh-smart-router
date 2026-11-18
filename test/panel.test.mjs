@@ -121,3 +121,24 @@ test('插件也能被点名', async () => {
   assert.deepEqual(res.body.pinned.plugins, ['dshmarket'])
   assert.deepEqual(res.body.pinned.families, ['android'])
 })
+
+test('响应里的每一块都是真数组/真对象，不是被序列化成 {} 的 Promise', async () => {
+  // 回归：attempt() 是 async 的，少一个 await 就会把 Promise 塞进 JSON，
+  // 客户端收到 {}，归一化后全变空数组 —— 表现是「技能有、插件和能力永远空」。
+  clearPins()
+  const res = await call(
+    handler({
+      listFamilies: () => [{ name: 'android', count: 12, sample: '触控' }],
+      listPlugins: () => [{ name: 'dshmarket', description: '插件市场' }],
+      readUsage: () => ({ total: 1234 }),
+      readUsed: () => ({ skills: ['pdf-tools'], tools: [{ name: 'read', count: 2 }] }),
+    }),
+    { url: '/api/dsh-smart-router?sessionId=s1' },
+  )
+  assert.ok(Array.isArray(res.body.plugins), 'plugins 必须是数组')
+  assert.ok(Array.isArray(res.body.families), 'families 必须是数组')
+  assert.equal(res.body.plugins.length, 1)
+  assert.equal(res.body.families.length, 1)
+  assert.equal(res.body.usage.total, 1234)
+  assert.deepEqual(res.body.used.skills, ['pdf-tools'])
+})
