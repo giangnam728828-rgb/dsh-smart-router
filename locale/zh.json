@@ -1,0 +1,40 @@
+{
+  "meta": {
+    "title": "智能路由",
+    "description": "每轮把相关的技能与插件能力放到模型面前并写明判断规矩，用不用、用哪个由模型自己决定。"
+  },
+  "config": {
+    "enabled": {
+      "title": "启用",
+      "description": "开关自动路由提示。"
+    },
+    "maxCandidates": {
+      "title": "每轮技能候选数",
+      "description": "一轮里最多给出几个技能候选。"
+    },
+    "minScore": {
+      "title": "候选下限",
+      "description": "只用来滤掉明显不相干的技能，不参与「该不该用」的判定。"
+    },
+    "includePlugins": {
+      "title": "列出已装插件",
+      "description": "在路由块里列出已安装的插件及其用途。"
+    },
+    "pluginsLimit": {
+      "title": "插件条目数",
+      "description": "最多列出几个插件。"
+    },
+    "includeToolFamilies": {
+      "title": "列出工具族",
+      "description": "在路由块里给出本轮可用工具的族摘要。"
+    },
+    "familiesLimit": {
+      "title": "工具族数量",
+      "description": "最多列出几个工具族。"
+    },
+    "debug": {
+      "title": "诊断日志",
+      "description": "把注入与错误记录到插件日志文件。"
+    }
+  }
+}

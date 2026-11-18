@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Smart router">
+  <rect width="64" height="64" rx="14" fill="#101418"/>
+  <g fill="none" stroke="#5ee0c0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 32h12"/>
+    <path d="M26 32c6 0 6-12 12-12h12"/>
+    <path d="M26 32c6 0 6 12 12 12h12"/>
+  </g>
+  <g fill="#5ee0c0">
+    <circle cx="50" cy="20" r="4"/>
+    <circle cx="50" cy="44" r="4"/>
+    <circle cx="14" cy="32" r="4"/>
+  </g>
+  <circle cx="50" cy="32" r="2.5" fill="#93a1ac"/>
+</svg>

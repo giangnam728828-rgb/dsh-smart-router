@@ -1,0 +1,40 @@
+{
+  "meta": {
+    "title": "Smart router",
+    "description": "Puts relevant skills and plugin capabilities in front of the model every turn, states the rules, and leaves the decision to the model."
+  },
+  "config": {
+    "enabled": {
+      "title": "Enabled",
+      "description": "Turn automatic routing hints on or off."
+    },
+    "maxCandidates": {
+      "title": "Skill candidates per turn",
+      "description": "How many skills may be offered as candidates in one turn."
+    },
+    "minScore": {
+      "title": "Candidate floor",
+      "description": "Only filters out clearly unrelated skills; it never decides whether a skill fits."
+    },
+    "includePlugins": {
+      "title": "List installed plugins",
+      "description": "Add the installed plugins and what they provide to the routing block."
+    },
+    "pluginsLimit": {
+      "title": "Plugin entries",
+      "description": "Maximum number of plugins listed."
+    },
+    "includeToolFamilies": {
+      "title": "List tool families",
+      "description": "Add a compact summary of the tool families available this turn."
+    },
+    "familiesLimit": {
+      "title": "Tool families",
+      "description": "Maximum number of tool families listed."
+    },
+    "debug": {
+      "title": "Diagnostic log",
+      "description": "Record injections and errors to the plugin log file."
+    }
+  }
+}
