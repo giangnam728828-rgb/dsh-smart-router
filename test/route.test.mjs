@@ -187,3 +187,15 @@ test('中文说明参与匹配：面板上看到的词能影响结果', () => {
   const result = narrow(skills, '帮我做个页面', { limit: 3, minimum: 0.012 })
   assert.equal(result.selected[0]?.name, 'x-panel-maker')
 })
+
+test('中文「落地页 / 官网」能召回 landing-page-design（词表缺口的回归）', () => {
+  const skills = [
+    { name: 'landing-page-design', description: 'Complete system for building high converting landing pages: structure, copy, SEO.', invocation: { modelInvocable: true } },
+    { name: 'unslop', description: 'Turns vibecoded AI-looking UI into a designed interface.', invocation: { modelInvocable: true } },
+  ]
+  for (const query of ['帮我做个落地页', '做一个官网首页']) {
+    const result = narrow(skills, query, { limit: 3, minimum: 0.012 })
+    const names = result.selected.map((skill) => skill.name)
+    assert.ok(names.includes('landing-page-design'), `${query} 应召回 landing-page-design，实际 ${names.join(',') || '（无）'}`)
+  }
+})
