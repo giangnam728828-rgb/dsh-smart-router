@@ -71,7 +71,7 @@ test('插件导出 name 与 apply', () => {
 
 test('step 1 且任务与技能重合时，追加一条候选消息', async () => {
   const ctx = makeCtx({ skills })
-  apply(ctx, { enabled: true })
+  apply(ctx, { enabled: true, includePlugins: false, includeToolFamilies: false })
   const listener = ctx.listeners.get('agent/pre-step')
   assert.equal(typeof listener, 'function', '必须挂上 agent/pre-step')
 
@@ -91,7 +91,7 @@ test('注入消息的 source.kind 不能是 V3 的 "plugin"（V4 会拒绝）', 
   // 回归测试：曾经照抄上游写成 { kind: 'plugin', plugin: name }，
   // V4 会话写入时报 "format v4 message requires a producer-owned source kind"。
   const ctx = makeCtx({ skills })
-  apply(ctx, { enabled: true })
+  apply(ctx, { enabled: true, includePlugins: false, includeToolFamilies: false })
   const listener = ctx.listeners.get('agent/pre-step')
   const agent = { id: 's-kind', session: { header: { cwd: '/tmp' } } }
   const decision = await once(listener, { agent, messages: [userMessage('合并 PDF')] })
@@ -109,7 +109,7 @@ test('注入消息的 source.kind 不能是 V3 的 "plugin"（V4 会拒绝）', 
 
 test('不匹配时不注入 —— 宁可不给，也不要让模型硬套', async () => {
   const ctx = makeCtx({ skills })
-  apply(ctx, { enabled: true })
+  apply(ctx, { enabled: true, includePlugins: false, includeToolFamilies: false })
   const listener = ctx.listeners.get('agent/pre-step')
   const agent = { id: 's2', session: { header: { cwd: '/tmp' } } }
   const decision = await once(listener, { agent, messages: [userMessage('今天天气怎么样')] })
@@ -118,7 +118,7 @@ test('不匹配时不注入 —— 宁可不给，也不要让模型硬套', asy
 
 test('step 2 及以后不再重复推候选', async () => {
   const ctx = makeCtx({ skills })
-  apply(ctx, { enabled: true })
+  apply(ctx, { enabled: true, includePlugins: false, includeToolFamilies: false })
   const listener = ctx.listeners.get('agent/pre-step')
   const agent = { id: 's3', session: { header: { cwd: '/tmp' } } }
   const decision = await once(listener, { agent, messages: [userMessage('合并 PDF')], step: 2 })
@@ -127,7 +127,7 @@ test('step 2 及以后不再重复推候选', async () => {
 
 test('同一组候选在一个会话里只推一次', async () => {
   const ctx = makeCtx({ skills })
-  apply(ctx, { enabled: true })
+  apply(ctx, { enabled: true, includePlugins: false, includeToolFamilies: false })
   const listener = ctx.listeners.get('agent/pre-step')
   const agent = { id: 's4', session: { header: { cwd: '/tmp' } } }
 
@@ -139,7 +139,7 @@ test('同一组候选在一个会话里只推一次', async () => {
 
 test('换一个任务时，候选会重新推一次', async () => {
   const ctx = makeCtx({ skills })
-  apply(ctx, { enabled: true })
+  apply(ctx, { enabled: true, includePlugins: false, includeToolFamilies: false })
   const listener = ctx.listeners.get('agent/pre-step')
   const agent = { id: 's5', session: { header: { cwd: '/tmp' } } }
 
@@ -157,7 +157,7 @@ test('关闭开关后什么都不注册', () => {
 
 test('技能服务缺失时不抛错，也不阻断这一轮', async () => {
   const ctx = makeCtx({})
-  apply(ctx, { enabled: true })
+  apply(ctx, { enabled: true, includePlugins: false, includeToolFamilies: false })
   const listener = ctx.listeners.get('agent/pre-step')
   const agent = { id: 's6' }
   const decision = await once(listener, { agent, messages: [userMessage('合并 PDF')] })
@@ -167,7 +167,7 @@ test('技能服务缺失时不抛错，也不阻断这一轮', async () => {
 test('技能快照抛错时降级为「这一轮没有提示」', async () => {
   const broken = { async snapshot() { throw new Error('boom') } }
   const ctx = makeCtx({ skills: broken })
-  apply(ctx, { enabled: true })
+  apply(ctx, { enabled: true, includePlugins: false, includeToolFamilies: false })
   const listener = ctx.listeners.get('agent/pre-step')
   const agent = { id: 's7' }
   const decision = await once(listener, { agent, messages: [userMessage('合并 PDF')] })
