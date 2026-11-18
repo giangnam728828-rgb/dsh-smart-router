@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { apply, name, SHARED_STATE_KEY, SOURCE_KIND } from '../lib/plugin.js'
+import { clearPins, setPinned } from '../lib/panel.js'
 
 /** 造一个最小的假 ctx：只实现 apply() 用到的那几个面。 */
 function makeCtx({ skills, tools } = {}) {
@@ -226,4 +227,45 @@ test('中途新增工具（装了新插件）后，静态块会补发一条更�
   const second = await once(listener, { agent, messages: [userMessage('随便聊聊')] })
   assert.equal(second.messages.length, 2, '内容变了应当补发')
   assert.ok(second.messages[1].content[0].text.includes('schedule'), '新工具族要出现在更新里')
+})
+
+test('面板勾选的技能，在下一轮开头被真正加载（一次性）', async () => {
+  delete globalThis[SHARED_STATE_KEY]
+  clearPins()
+  const registry = {
+    async snapshot() {
+      return { complete: true, skills: [{ name: 'pdf-tools', description: '合并、拆分 PDF 文件', invocation: { modelInvocable: true, userInvocable: true } }] }
+    },
+    async get(name) {
+      if (name !== 'pdf-tools') return undefined
+      return { name: 'pdf-tools', provider: 'fs', content: '用 pypdf 合并。', invocation: { modelInvocable: true, userInvocable: true } }
+    },
+  }
+  const ctx = makeCtx({ skills: registry })
+  apply(ctx, { enabled: true, includePlugins: false })
+  const listener = ctx.listeners.get('agent/pre-step')
+  const agent = { id: 's-pin', session: { header: { cwd: '/tmp' } } }
+
+  setPinned('s-pin', ['pdf-tools'])
+  const first = await once(listener, { agent, messages: [userMessage('随便聊聊')] })
+  const pinnedMessage = first.messages.find((m) => m.source?.kind === 'skill-invocation')
+  assert.ok(pinnedMessage, '钉住的技能必须被加载')
+  assert.equal(pinnedMessage.source.name, 'pdf-tools')
+  assert.ok(pinnedMessage.content[0].text.includes('pypdf'), '正文要真的进来')
+
+  // 第二轮不该再塞一次
+  const second = await once(listener, { agent, messages: [userMessage('随便聊聊')] })
+  assert.equal(second.messages.filter((m) => m.source?.kind === 'skill-invocation').length, 0)
+})
+
+test('钉住一个不存在的技能不会炸，也不会阻断这一轮', async () => {
+  delete globalThis[SHARED_STATE_KEY]
+  clearPins()
+  const ctx = makeCtx({ skills })
+  apply(ctx, { enabled: true, includePlugins: false })
+  const listener = ctx.listeners.get('agent/pre-step')
+  const agent = { id: 's-pin2', session: { header: { cwd: '/tmp' } } }
+  setPinned('s-pin2', ['ghost-skill'])
+  const decision = await once(listener, { agent, messages: [userMessage('随便聊聊')] })
+  assert.equal(decision.kind, 'enter')
 })
