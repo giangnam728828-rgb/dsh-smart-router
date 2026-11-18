@@ -177,3 +177,13 @@ test('digestOf: 同样的文本同键，变一个字符就变键', () => {
   assert.equal(digestOf('abc'), digestOf('abc'))
   assert.notEqual(digestOf('abc'), digestOf('abd'))
 })
+
+test('中文说明参与匹配：面板上看到的词能影响结果', () => {
+  // 技能名和英文描述都不含「页面」，只有中文说明里有。
+  const skills = [
+    { name: 'x-panel-maker', description: 'Build an optional surface inside this app', keywords: '用户要一个页面或面板时使用' },
+    { name: 'pdf-tools', description: 'merge and split PDF files' },
+  ]
+  const result = narrow(skills, '帮我做个页面', { limit: 3, minimum: 0.012 })
+  assert.equal(result.selected[0]?.name, 'x-panel-maker')
+})
