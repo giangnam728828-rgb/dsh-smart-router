@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { apply, name } from '../lib/index.js'
+import { apply, name, SOURCE_KIND } from '../lib/plugin.js'
 
 /** 造一个最小的假 ctx：只实现 apply() 用到的那几个面。 */
 function makeCtx({ skills, tools } = {}) {
@@ -68,11 +68,30 @@ test('step 1 且任务与技能重合时，追加一条候选消息', async () =
   assert.equal(decision.kind, 'enter')
   assert.equal(decision.messages.length, 2, '原消息 + 一条注入')
   const injected = decision.messages[1]
-  assert.equal(injected.source.kind, 'plugin')
-  assert.equal(injected.source.plugin, 'dsh-smart-router')
+  assert.equal(injected.source.kind, 'smart-router')
   const text = injected.content[0].text
   assert.ok(text.includes('pdf-tools'))
   assert.ok(text.includes('skill 工具'))
+})
+
+test('注入消息的 source.kind 不能是 V3 的 "plugin"（V4 会拒绝）', async () => {
+  // 回归测试：曾经照抄上游写成 { kind: 'plugin', plugin: name }，
+  // V4 会话写入时报 "format v4 message requires a producer-owned source kind"。
+  const ctx = makeCtx({ skills })
+  apply(ctx, { enabled: true })
+  const listener = ctx.listeners.get('agent/pre-step')
+  const agent = { id: 's-kind', session: { header: { cwd: '/tmp' } } }
+  const decision = await once(listener, { agent, messages: [userMessage('合并 PDF')] })
+
+  const injected = decision.messages.slice(1)
+  assert.ok(injected.length > 0, '这一轮应当有注入')
+  for (const message of injected) {
+    const kind = message.source?.kind
+    assert.equal(typeof kind, 'string')
+    assert.ok(kind.length > 0, 'kind 不能为空')
+    assert.notEqual(kind, 'plugin', 'plugin 是已退役的 V3 写法')
+    assert.equal(kind, SOURCE_KIND)
+  }
 })
 
 test('不匹配时不注入 —— 宁可不给，也不要让模型硬套', async () => {
