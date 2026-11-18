@@ -18,6 +18,18 @@ function makeCtx({ skills, tools } = {}) {
       listeners.set(event, handler)
       return () => listeners.delete(event)
     },
+    /** 假的路由注册：真实实现要等 webServer 就绪，测试里直接给一个。 */
+    inject(deps, callback) {
+      const inner = {
+        webServer: { register: () => () => {} },
+        effect: (fn) => {
+          const dispose = fn()
+          return typeof dispose === 'function' ? dispose : () => {}
+        },
+      }
+      callback(inner)
+      return inner
+    },
   }
 }
 
