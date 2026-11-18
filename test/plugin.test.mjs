@@ -142,3 +142,26 @@ test('技能快照抛错时降级为「这一轮没有提示」', async () => {
   assert.equal(decision.kind, 'enter')
   assert.equal(decision.messages.length, 1)
 })
+
+test('任务命中工具族时，即使没有技能候选也会给一条能力提示', async () => {
+  const fakeTools = {
+    definitions() {
+      return [
+        { name: 'android_click', description: '真实触控点击实体主屏' },
+        { name: 'android_swipe', description: '真实触控滑动实体主屏' },
+        { name: 'schedule_create', description: '创建定时任务' },
+      ]
+    },
+  }
+  const ctx = makeCtx({ skills, tools: fakeTools })
+  apply(ctx, { enabled: true, includePlugins: false })
+  const listener = ctx.listeners.get('agent/pre-step')
+  const agent = { id: 's8', session: { header: { cwd: '/tmp' } } }
+  const decision = await once(listener, { agent, messages: [userMessage('在手机屏幕上点击那个按钮')] })
+  // 静态块（工具族概览）+ 回合块（本轮可能用到的族），各一条。
+  assert.equal(decision.messages.length, 3)
+  const texts = decision.messages.slice(1).map((m) => m.content[0].text)
+  const turn = texts[texts.length - 1]
+  assert.ok(turn.includes('本轮可能用得上'), '最后一条应当是回合块')
+  assert.ok(turn.includes('android'), '应当把 android 族排到前面')
+})
