@@ -40,16 +40,27 @@ function fixture() {
 }
 
 test('resolveProfileDir: 没有 DSH_PROFILE_DIR 时退回 profiles 下唯一的目录', () => {
-  const saved = { dir: process.env.DSH_PROFILE_DIR, home: process.env.DSH_HOME, profile: process.env.DSH_PROFILE }
+  const saved = {
+    dir: process.env.DSH_PROFILE_DIR,
+    home: process.env.DSH_HOME,
+    profile: process.env.DSH_PROFILE,
+    startup: process.env.DSHA_STARTUP_PROFILE,
+  }
   try {
     delete process.env.DSH_PROFILE_DIR
     delete process.env.DSH_PROFILE
+    delete process.env.DSHA_STARTUP_PROFILE
     process.env.DSH_HOME = '/tmp/does-not-matter'
     // 目录猜不到时返回 undefined，而不是抛错
     const resolved = resolveProfileDir()
     assert.ok(resolved === undefined || typeof resolved === 'string')
   } finally {
-    for (const [key, value] of [['DSH_PROFILE_DIR', saved.dir], ['DSH_HOME', saved.home], ['DSH_PROFILE', saved.profile]]) {
+    for (const [key, value] of [
+      ['DSH_PROFILE_DIR', saved.dir],
+      ['DSH_HOME', saved.home],
+      ['DSH_PROFILE', saved.profile],
+      ['DSHA_STARTUP_PROFILE', saved.startup],
+    ]) {
       if (value === undefined) delete process.env[key]
       else process.env[key] = value
     }
@@ -79,4 +90,47 @@ test('listInstalledPlugins: 断掉的链接不会让整次列举失败', () => {
 test('listInstalledPlugins: limit=0 返回空数组', () => {
   const { profile } = fixture()
   assert.deepEqual(listInstalledPlugins({ profileDir: profile, limit: 0 }), [])
+})
+
+test('resolveProfileDir: profiles 下有两个目录时，认 DSHA_STARTUP_PROFILE', () => {
+  // 这是线上真实踩过的坑：跑无头任务会建一个 headless profile，
+  // profiles 从「恰好一个」变成两个，旧的兜底直接返回 undefined，
+  // 插件清单恒为空 —— 面板「插件」页签显示 0。
+  const root = mkdtempSync(join(tmpdir(), 'smart-router-multi-'))
+  mkdirSync(join(root, 'profiles', 'web'), { recursive: true })
+  mkdirSync(join(root, 'profiles', 'headless'), { recursive: true })
+
+  const saved = {
+    dir: process.env.DSH_PROFILE_DIR,
+    home: process.env.DSH_HOME,
+    profile: process.env.DSH_PROFILE,
+    startup: process.env.DSHA_STARTUP_PROFILE,
+  }
+  try {
+    delete process.env.DSH_PROFILE_DIR
+    delete process.env.DSH_PROFILE
+    process.env.DSH_HOME = root
+
+    // 没有启动信号时，两个目录猜不出来 —— 明确返回 undefined，不瞎选
+    delete process.env.DSHA_STARTUP_PROFILE
+    assert.equal(resolveProfileDir(), undefined, '两个目录、无信号时不该猜')
+
+    // 有了启动信号就精确命中
+    process.env.DSHA_STARTUP_PROFILE = 'web'
+    assert.equal(resolveProfileDir(), join(root, 'profiles', 'web'))
+
+    // 信号指向不存在的目录时不硬套，退回 undefined
+    process.env.DSHA_STARTUP_PROFILE = 'nope'
+    assert.equal(resolveProfileDir(), undefined)
+  } finally {
+    for (const [key, value] of [
+      ['DSH_PROFILE_DIR', saved.dir],
+      ['DSH_HOME', saved.home],
+      ['DSH_PROFILE', saved.profile],
+      ['DSHA_STARTUP_PROFILE', saved.startup],
+    ]) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
 })
